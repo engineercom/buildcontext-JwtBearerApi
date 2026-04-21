@@ -1,0 +1,12 @@
+﻿{
+  "userName": "test",
+  "fullName": "test api",
+  "email": "admin@test@com",
+  "password": "Test123!"
+}
+
+{
+  "username": "test",
+  "password": "Test123!"
+}
+
