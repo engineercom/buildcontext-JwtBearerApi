@@ -4,4 +4,3 @@ obj/
 *.user
 *.suo
 *.db
-appsettings.Development.json

@@ -1,8 +1,11 @@
 ﻿using JwtBearerApi.Data;
 using JwtBearerApi.Dtos;
+using JwtBearerApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -18,11 +21,14 @@ namespace JwtBearerApi.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<AppRole> _roleManager;
         private readonly IConfiguration _config;
-        public AuthController(UserManager<AppUser> userManager, IConfiguration config, RoleManager<AppRole> roleManager)
+
+        private readonly AppDbContext _context;
+        public AuthController(UserManager<AppUser> userManager, IConfiguration config, RoleManager<AppRole> roleManager, AppDbContext context)
         {
             _userManager = userManager;
             _config = config;
             _roleManager = roleManager;
+            _context = context;
         }
         [Authorize(Roles = "Admin")]
         [HttpGet]
@@ -66,8 +72,39 @@ namespace JwtBearerApi.Controllers
             var result = await _userManager.CheckPasswordAsync(hasUser, loginDto.Password);
             if (!result) return Unauthorized("Wrong Password");
             var token = GenerateToken(hasUser);
+            var refreshToken = CreateRefreshToken();
 
-            return Ok(new { token });
+            hasUser.RefreshToken = refreshToken;
+            hasUser.RefreshTokenExpireDate = DateTime.Now.AddDays(7);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { 
+            Token=token,
+            RefreshToken=refreshToken
+            
+            }); 
+        }
+        [Authorize]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh(TokenResponse request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(x=>x.RefreshToken==request.RefreshToken);
+            if (user == null || user.RefreshTokenExpireDate <= DateTime.Now) return Unauthorized();
+
+            var newAccessToken =await GenerateToken(user);
+            var newRefreshToken = CreateRefreshToken();
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpireDate = DateTime.Now.AddDays(7);
+            await _context.SaveChangesAsync();
+
+            return Ok(new 
+            {
+
+                AccessToken = newAccessToken,
+                RefreshToken= newRefreshToken
+
+            });
         }
 
         private async Task<string> GenerateToken(AppUser user)
@@ -94,6 +131,15 @@ namespace JwtBearerApi.Controllers
                 signingCredentials: creds
                 );
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        private string CreateRefreshToken()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+
+
+            return Convert.ToBase64String(randomNumber);
         }
 
     }

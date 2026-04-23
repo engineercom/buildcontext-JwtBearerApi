@@ -4,9 +4,13 @@
   "email": "admin@test@com",
   "password": "Test123!"
 }
-
+//role:user
 {
   "username": "test",
   "password": "Test123!"
 }
-
+//role:admin
+{
+  "username": "mirket",
+  "password": "Test123!"
+}
